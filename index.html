@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MediNote v5.0 // Neural Clinical Archive</title>
+<meta content="web_standard" name="shell-type"/>
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200..900&amp;family=JetBrains+Mono:wght@300..800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface-base": "#030712",
+            "surface-canvas": "#070c18",
+            "surface-card": "#0b1329",
+            "surface-overlay": "#111c38",
+            "neon-cyan": "#00f0ff",
+            "neon-teal": "#00e5a3",
+            "neon-violet": "#a855f7",
+            "primary": "#38bdf8",
+            "primary-bright": "#00f0ff",
+            "secondary": "#34d399",
+            "secondary-bright": "#00e5a3",
+            "telegram-blue": "#229ed9",
+            "border-glass": "rgba(56, 189, 248, 0.16)",
+            "border-glass-active": "rgba(0, 240, 255, 0.45)",
+            "glow-cyan": "rgba(0, 240, 255, 0.25)",
+            "glow-emerald": "rgba(0, 229, 163, 0.25)",
+            "text-primary": "#f8fafc",
+            "text-muted": "#94a3b8",
+            "text-dim": "#64748b"
+          },
+          fontFamily: {
+            sans: ["Inter", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"]
+          },
+          animation: {
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'scanline': 'scanline 8s linear infinite',
+            'ecg': 'ecgPulse 3s ease-in-out infinite'
+          },
+          keyframes: {
+            scanline: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(1000%)' }
+            },
+            ecgPulse: {
+              '0%, 100%': { strokeDashoffset: '400' },
+              '50%': { strokeDashoffset: '0' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #030712;
+        color: #f8fafc;
+      }
+      body {
+        overflow-x: hidden;
+      }
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070c18;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #162447;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00f0ff;
+    }
+    .cyber-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+    }
+    .glow-box-cyan {
+      box-shadow: 0 0 25px -5px rgba(0, 240, 255, 0.25);
+    }
+    .glow-box-teal {
+      box-shadow: 0 0 25px -5px rgba(0, 229, 163, 0.25);
+    }
+    .reveal-elem {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal-elem.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .interactive-glow {
+      position: absolute;
+      width: 380px;
+      height: 380px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      transition: opacity 0.3s ease;
+    }
+  </style>
+</head>
+<body class="bg-surface-base font-sans antialiased relative min-h-screen selection:bg-neon-cyan/30 selection:text-neon-cyan">
+<!-- DYNAMIC WEBGL SHADER BACKGROUND -->
+<!-- STITCH_SHADER_START:ANIMATION_6 class="fixed inset-0 w-full h-full -z-20 pointer-events-none opacity-45" -->
+<div class="fixed inset-0 w-full h-full -z-20 pointer-events-none opacity-45" style="display:block;">
+<canvas id="shader-canvas-ANIMATION_6" style="display:block;width:100%;height:100%"></canvas>
+<script>
+(function() {
+  const canvas = document.getElementById('shader-canvas-ANIMATION_6');
+
+  // Sync the WebGL drawing-buffer size with the CSS-driven layout size.
+  // This fires on initial layout and whenever the element is resized.
+  function syncSize() {
+    const w = canvas.clientWidth  || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
+
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if (!gl) return;
+  const vs = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+  const fs = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+
+// Simplex/fbm inspired fluid field for a high-tech medical cyan/navy cyber aesthetic
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+    for (int i = 0; i < 4; ++i) {
+        v += a * noise(p);
+        p = rot * p * 2.0 + vec2(u_time * 0.05);
+        a *= 0.5;
+    }
+    return v;
+}
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+    vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution.xy) / min(u_resolution.x, u_resolution.y);
+    
+    // Slow fluid wave motion
+    float t = u_time * 0.25;
+    vec2 q = vec2(fbm(p + vec2(t * 0.2, -t * 0.1)), fbm(p + vec2(-t * 0.15, t * 0.2)));
+    vec2 r = vec2(fbm(p + 3.0 * q + vec2(1.7, 9.2) + 0.15 * t), fbm(p + 3.0 * q + vec2(8.3, 2.8) + 0.126 * t));
+    float f = fbm(p + 4.0 * r);
+
+    // Deep luminous cyber dark medical palette (#070b16 deep void, #004b6e teal-blue, #00e5ff bright neon cyan glow)
+    vec3 colDeep = vec3(0.027, 0.043, 0.086);      // #070b16
+    vec3 colMid = vec3(0.035, 0.141, 0.235);       // #09243c
+    vec3 colGlow = vec3(0.0, 0.835, 0.95);         // #00d5f2
+    vec3 colViolet = vec3(0.12, 0.08, 0.28);       // faint bio-luminescent violet
+
+    vec3 col = mix(colDeep, colMid, clamp((f * f) * 3.5, 0.0, 1.0));
+    col = mix(col, colViolet, clamp(length(q), 0.0, 1.0) * 0.4);
+    col += colGlow * pow(clamp(f, 0.0, 1.0), 3.8) * 0.85;
+
+    // Subtle grid scan lines
+    float grid = sin(uv.y * 120.0 + u_time * 0.5) * 0.02;
+    col += vec3(grid * 0.2, grid * 0.5, grid * 0.8);
+
+    // Vignette
+    float vig = uv.x * (1.0 - uv.x) * uv.y * (1.0 - uv.y) * 15.0;
+    col *= clamp(vig, 0.4, 1.0);
+
+    gl_FragColor = vec4(col, 1.0);
+}`;
+  function cs(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const pos = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(pos);
+  gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+  const uTime = gl.getUniformLocation(prog, 'u_time');
+  const uRes = gl.getUniformLocation(prog, 'u_resolution');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  // u_mouse is in pixel coordinates matching u_resolution (ShaderToy convention).
+  // Shaders that need normalized coords should use: u_mouse / u_resolution.
+  let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+  window.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      const nx = (event.clientX - rect.left) / rect.width;
+      const ny = 1.0 - (event.clientY - rect.top) / rect.height;
+      mouse.x = nx * canvas.width;
+      mouse.y = ny * canvas.height;
+    }
+  });
+
+  function render(t) {
+    if (typeof ResizeObserver === 'undefined') syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    if (uMouse) gl.uniform2f(uMouse, mouse.x, mouse.y);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  render(0);
+})();
+</script>
+</div>
+<!-- STITCH_SHADER_END:ANIMATION_6 -->
+<!-- CYBER GRID & AMBIENT GLOW MESH OVERLAYS -->
+<div class="fixed inset-0 cyber-grid -z-10 pointer-events-none opacity-60"></div>
+<div class="fixed -top-40 left-1/4 w-[600px] h-[600px] rounded-full bg-cyan-500/10 blur-[140px] -z-10 pointer-events-none"></div>
+<div class="fixed top-1/2 -right-40 w-[600px] h-[600px] rounded-full bg-emerald-500/8 blur-[150px] -z-10 pointer-events-none"></div>
+<!-- INTERACTIVE MOUSE FOLLOWER GLOW -->
+<div class="interactive-glow opacity-0 hidden md:block" id="cursor-glow"></div>
+<!-- FLOATING HUD TOP NAVIGATION & STATUS BAR -->
+<header class="fixed top-0 left-0 w-full z-50 backdrop-blur-2xl bg-surface-base/80 border-b border-cyan-500/15 shadow-[0_4px_30px_rgba(0,0,0,0.8)]">
+<!-- Clinical Partner Flash Banner -->
+<div class="w-full bg-slate-950/90 border-b border-cyan-500/10 px-4 sm:px-8 py-1.5 flex items-center justify-between text-[11px] font-mono tracking-wider">
+<div class="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 text-neon-teal font-semibold border border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-neon-teal animate-ping"></span>
+          SPONSOR CLINICAL NODE
+        </span>
+<span class="text-text-muted hidden sm:inline text-slate-300">
+          Siemens Healthineers Clinical AI &amp; 3M Littmann Diagnostic Blueprints
+        </span>
+</div>
+<div class="flex items-center gap-4 text-text-dim text-[10px]">
+<div class="flex items-center gap-1.5">
+<span class="text-text-muted">NEURAL SYNC:</span>
+<span class="text-neon-cyan font-semibold">v5.02 STABLE</span>
+</div>
+<span class="hidden md:inline text-slate-700">|</span>
+<div class="hidden md:flex items-center gap-1.5">
+<span class="text-text-muted">LATENCY:</span>
+<span class="text-neon-teal font-bold">14ms</span>
+</div>
+</div>
+</div>
+<!-- Main Navigation Bar -->
+<div class="max-w-[1440px] mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+<div class="flex items-center gap-5">
+<a class="flex items-center gap-3 group" href="#">
+<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-teal-500/10 border border-cyan-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.2)] group-hover:border-cyan-400 group-hover:scale-105 transition-all">
+<span class="material-symbols-outlined text-neon-cyan text-xl">vital_signs</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-black tracking-tight text-lg text-white font-sans">MEDINOTE</span>
+<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/40 text-neon-cyan">v5.0</span>
+</div>
+<span class="text-[10px] font-mono text-slate-400 tracking-wider block -mt-0.5">NEURAL CLINICAL ATELIER</span>
+</div>
+</a>
+<!-- Live Sync Pill -->
+<div class="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-cyan-500/20 text-xs font-mono">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-teal opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-neon-teal"></span>
+</span>
+<span class="text-slate-300 text-[11px]">TELEGRAM MIRROR:</span>
+<a class="text-neon-cyan hover:underline font-bold" href="https://t.me/AREA_139" target="_blank">@AREA_139</a>
+</div>
+</div>
+<!-- Quick Nav Links -->
+<nav class="hidden md:flex items-center gap-6 text-xs font-mono">
+<a class="text-slate-300 hover:text-neon-cyan transition-colors flex items-center gap-1.5" href="#repo-stream">
+<span class="w-1 h-1 rounded-full bg-cyan-400"></span> MBBS Atlases
+        </a>
+<a class="text-slate-300 hover:text-neon-cyan transition-colors flex items-center gap-1.5" href="#section-blueprints">
+<span class="w-1 h-1 rounded-full bg-teal-400"></span> Anatomy 3D
+        </a>
+<a class="text-slate-300 hover:text-neon-cyan transition-colors flex items-center gap-1.5" href="#section-physiology">
+<span class="w-1 h-1 rounded-full bg-purple-400"></span> Pathways
+        </a>
+<a class="text-slate-300 hover:text-neon-cyan transition-colors flex items-center gap-1.5" href="#section-qb">
+<span class="w-1 h-1 rounded-full bg-amber-400"></span> Question Bank
+        </a>
+</nav>
+<!-- Curator Node & Telegram Dispatch CTA -->
+<div class="flex items-center gap-3">
+<a class="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500 hover:to-teal-400 border border-cyan-500/40 text-neon-cyan hover:text-slate-950 font-mono text-xs font-bold transition-all shadow-[0_0_20px_rgba(0,240,255,0.15)] hover:shadow-[0_0_25px_rgba(0,240,255,0.4)]" href="https://t.me/AREA_139" target="_blank">
+<span class="material-symbols-outlined text-sm">send</span>
+<span>Open Cloud Channel</span>
+</a>
+<a class="relative group" href="https://t.me/AREA_139" target="_blank">
+<img alt="Ahmed Istiaq" class="w-9 h-9 rounded-xl object-cover ring-1 ring-cyan-400/40 p-0.5 bg-slate-900 group-hover:ring-neon-cyan transition-all" src="https://lh3.googleusercontent.com/aida/AEtjO1Xk4t8_ST1f3FlV8K43DHsdAJ-_HShPn3uf6b-Vuwp-ho5wsReb-aLUT21a2IjfWr0eDLV5B_8iyjcdMJh79Y_-t6CRvVop4WbJVyZ-kkbwLT5UzuTCFp997VIsavd7iQUdZdbmo7aCVFrYc-6gxcFBIsT87Uhz8Rg9XTpJdh_Ru619t9HS7qAayRchiDKa4AByvMOGt-xDaDmJrnVFsYcSvopIBr-WMDd07fTTmtKQ-HUKMytiuylF5Bk"/>
+<span class="absolute -bottom-1 -right-1 w-3 h-3 bg-neon-teal border-2 border-slate-950 rounded-full"></span>
+</a>
+</div>
+</div>
+</header>
+<!-- MAIN VIEWPORT CONTAINER -->
+<main class="w-full pt-28 pb-20 relative">
+<div class="max-w-[1440px] mx-auto px-4 sm:px-8 flex flex-col gap-12">
+<!-- HERO BENTO SECTION -->
+<section class="reveal-elem flex flex-col gap-6 pt-4">
+<!-- Top Status Bar & RpMC Terminal Stamp -->
+<div class="flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900/80 border border-cyan-500/30 backdrop-blur-md">
+<span class="w-2 h-2 rounded-full bg-neon-cyan animate-ping"></span>
+<span class="text-neon-cyan font-bold tracking-widest text-[11px]">ACTIVE PROTOCOL // RpMC-54 CLINICAL REPOSITORY</span>
+</div>
+<div class="flex items-center gap-2 text-slate-400">
+<span class="material-symbols-outlined text-base text-neon-teal">verified_user</span>
+<span>CURATOR: <strong class="text-slate-200">AHMED ISTIAQ</strong> (MBBS CANDIDATE · RANGPUR MEDICAL COLLEGE)</span>
+</div>
+</div>
+<!-- Hero Bento Grid Master -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+<!-- Main Hero Cyber Card (8 Cols) -->
+<div class="lg:col-span-8 p-6 sm:p-10 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/25 shadow-2xl relative overflow-hidden flex flex-col justify-between group hover:border-cyan-400/50 transition-all duration-500">
+<!-- Decorative Cyber Accents -->
+<div class="absolute -top-24 -right-24 w-80 h-80 bg-gradient-to-br from-cyan-500/15 via-teal-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent"></div>
+<div class="space-y-4 relative z-10">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-neon-cyan text-[11px] font-mono font-semibold tracking-wider uppercase">
+<span class="material-symbols-outlined text-xs">neurology</span>
+                Next-Gen Pre-Clinical Cognitive Engine
+              </div>
+<h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight font-sans">
+                MEDINOTE: THE <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan via-teal-300 to-neon-teal">NEURAL CLINICAL</span> ARCHIVE
+              </h1>
+<p class="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed font-sans font-normal">
+                Handwritten high-yield anatomical blueprints, molecular pathways, embryology schemas, and ward bedside clinical pearls. Specially engineered for rapid retrieval during clinical rounds, viva examinations, and pre-clinical MBBS mastery.
+              </p>
+</div>
+<!-- Telemetry Stats Quad -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8 mt-6 border-t border-cyan-500/15 relative z-10">
+<div class="p-3.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 hover:border-cyan-400/40 transition-all">
+<div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">SYNCED NODES</div>
+<div class="text-2xl font-mono font-black text-neon-cyan mt-1">3,420+</div>
+<div class="text-[11px] text-slate-400 mt-0.5">High-res vector PDFs</div>
+</div>
+<div class="p-3.5 rounded-xl bg-slate-950/70 border border-teal-500/15 hover:border-teal-400/40 transition-all">
+<div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">CLOUD PIPELINE</div>
+<div class="text-2xl font-mono font-black text-neon-teal mt-1">Instant</div>
+<div class="text-[11px] text-slate-400 mt-0.5">Direct Telegram sync</div>
+</div>
+<div class="p-3.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 hover:border-cyan-400/40 transition-all">
+<div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">ANATOMY 3D</div>
+<div class="text-2xl font-mono font-black text-white mt-1">40+ Boards</div>
+<div class="text-[11px] text-slate-400 mt-0.5">Dissection schematics</div>
+</div>
+<div class="p-3.5 rounded-xl bg-slate-950/70 border border-purple-500/15 hover:border-purple-400/40 transition-all">
+<div class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">MBBS ATLASES</div>
+<div class="text-2xl font-mono font-black text-purple-300 mt-1">21 Volumes</div>
+<div class="text-[11px] text-slate-400 mt-0.5">Indexed clinical texts</div>
+</div>
+</div>
+</div>
+<!-- Official Telegram Cloud Node Card (4 Cols) -->
+<div class="lg:col-span-4 p-6 sm:p-8 rounded-2xl bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-surface-base backdrop-blur-xl border border-cyan-500/25 shadow-2xl relative overflow-hidden flex flex-col justify-between group hover:border-teal-400/50 transition-all">
+<!-- Pulsing SVG ECG Line Ambient Graphic -->
+<div class="absolute -right-10 -bottom-10 w-48 h-48 bg-telegram-blue/15 rounded-full blur-3xl pointer-events-none"></div>
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-telegram-blue/20 border border-telegram-blue/40 text-sky-400 font-mono text-[10px] font-semibold uppercase">
+<span class="material-symbols-outlined text-xs">cloud_done</span>
+                  OFFICIAL TELEGRAM HUB
+                </span>
+<span class="flex items-center gap-1 text-[11px] font-mono text-neon-teal">
+<span class="w-1.5 h-1.5 rounded-full bg-neon-teal animate-ping"></span>
+                  LIVE STREAM
+                </span>
+</div>
+<!-- Channel Identity Block -->
+<div class="flex items-center gap-4 p-3 rounded-xl bg-slate-950/60 border border-cyan-500/15">
+<img alt="MediNote Channel" class="w-14 h-14 rounded-xl object-cover ring-2 ring-neon-cyan/40" src="https://lh3.googleusercontent.com/aida/AEtjO1Xk4t8_ST1f3FlV8K43DHsdAJ-_HShPn3uf6b-Vuwp-ho5wsReb-aLUT21a2IjfWr0eDLV5B_8iyjcdMJh79Y_-t6CRvVop4WbJVyZ-kkbwLT5UzuTCFp997VIsavd7iQUdZdbmo7aCVFrYc-6gxcFBIsT87Uhz8Rg9XTpJdh_Ru619t9HS7qAayRchiDKa4AByvMOGt-xDaDmJrnVFsYcSvopIBr-WMDd07fTTmtKQ-HUKMytiuylF5Bk"/>
+<div class="min-w-0 flex-1">
+<div class="font-bold text-white text-base tracking-tight truncate flex items-center gap-1.5">
+                    @AREA_139
+                    <span class="material-symbols-outlined text-neon-cyan text-sm">verified</span>
+</div>
+<div class="text-xs text-slate-400 truncate font-sans">Ahmed Istiaq's Clinical Archive</div>
+<div class="text-[11px] font-mono text-neon-teal font-semibold mt-0.5">3,420+ Synced Documents</div>
+</div>
+</div>
+<!-- Telegram Stream Feed Description -->
+<p class="text-xs text-slate-400 leading-relaxed font-sans">
+                Real-time broadcast mirror feeding zero-compression anatomical PNG blueprints, written exam recall packets, and viva audio drills directly from Rangpur Medical College clinical wards.
+              </p>
+<!-- Mini Animated ECG Telemetry -->
+<div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/20">
+<div class="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+<span>TELEMETRY ECG STREAM</span>
+<span class="text-neon-cyan font-bold">78 BPM NORMAL</span>
+</div>
+<svg class="w-full h-8 stroke-neon-cyan fill-none" viewbox="0 0 300 40">
+<path class="animate-ecg" d="M0,20 L40,20 L50,8 L60,32 L70,20 L110,20 L120,4 L130,36 L140,20 L200,20 L210,10 L220,30 L230,20 L300,20" stroke-dasharray="400" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="pt-6">
+<a class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-telegram-blue to-cyan-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(34,158,217,0.3)] hover:shadow-[0_0_25px_rgba(0,240,255,0.5)] transition-all" href="https://t.me/AREA_139" target="_blank">
+<span class="material-symbols-outlined text-base">send</span>
+<span>Enter Telegram Cloud Channel</span>
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+<!-- HIGH IMPACT LEADERBOARD ADVERTISEMENT: CLINICAL TOOLS & PARTNER -->
+<div class="w-full rounded-2xl bg-gradient-to-r from-slate-900/80 via-slate-950/90 to-slate-900/80 p-4 sm:p-6 border border-cyan-500/30 backdrop-blur-xl shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 group hover:border-cyan-400/50 transition-all">
+<div class="absolute top-0 right-0 py-1 px-3 bg-cyan-500/20 border-b border-l border-cyan-500/30 text-neon-cyan font-mono text-[9px] font-bold tracking-widest rounded-bl-xl uppercase">
+            VERIFIED CLINICAL PARTNER // LITTMANN &amp; SIEMENS
+          </div>
+<div class="flex items-center gap-4 pt-2 md:pt-0">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 flex items-center justify-center text-neon-cyan shrink-0 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+<span class="material-symbols-outlined text-2xl">ecg_heart</span>
+</div>
+<div>
+<div class="flex flex-wrap items-center gap-2">
+<h4 class="font-bold text-white text-base tracking-tight">3M Littmann CORE Digital Acoustic &amp; Siemens Diagnostic Suite</h4>
+<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-neon-teal border border-emerald-500/30 font-mono text-[9px] font-bold uppercase">RPMC VERIFIED APPRENTICE</span>
+</div>
+<p class="text-xs text-slate-400 mt-1 max-w-2xl font-sans">
+                Official high-fidelity clinical diagnostic equipment. Rangpur Medical College apprentice discount with verified student code <span class="font-mono text-neon-cyan font-bold">#MEDINOTE139</span>.
+              </p>
+</div>
+</div>
+<div class="flex items-center gap-3 shrink-0 w-full md:w-auto">
+<a class="w-full md:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500 hover:to-teal-400 border border-cyan-500/40 text-neon-cyan hover:text-slate-950 font-mono text-xs font-bold transition-all text-center" href="https://t.me/AREA_139" target="_blank">
+              Claim Student Grant
+            </a>
+</div>
+</div>
+<!-- SEARCH PROTOCOL BAR & FILTER MATRIX -->
+<div class="flex flex-col gap-4 pt-2">
+<!-- Search Capsule Bar -->
+<div class="w-full rounded-2xl bg-slate-900/70 border border-cyan-500/25 backdrop-blur-xl shadow-2xl p-2 flex items-center gap-3 focus-within:border-neon-cyan transition-all">
+<div class="pl-3 flex items-center text-neon-cyan">
+<span class="material-symbols-outlined text-xl">manage_search</span>
+</div>
+<input class="w-full bg-transparent border-none outline-none text-white placeholder:text-slate-500 text-sm font-sans focus:ring-0" id="clinical-search" placeholder="Search neural blueprints, cranial nerves, mediastinum, Gray's, Guyton, past questions..." type="text"/>
+<div class="pr-3 hidden sm:flex items-center gap-2 font-mono text-xs text-slate-500">
+<kbd class="px-2 py-1 rounded bg-slate-800 border border-cyan-500/20 text-neon-cyan text-[10px]">⌘K</kbd>
+<span>SEARCH PROTOCOL</span>
+</div>
+</div>
+<!-- Dynamic Category Filter Chips -->
+<div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" id="filter-chip-row">
+<button class="filter-btn active-chip px-4 py-2 rounded-xl bg-neon-cyan text-slate-950 font-mono text-xs font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(0,240,255,0.4)] transition-all" data-cat="all">
+<span>All Syntheses</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950/20">47</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="textbooks">
+<span>MBBS Books</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">21</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="anatomy">
+<span>Anatomy 3D</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">17</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="physiology">
+<span>Physiology</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">3</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="biochemistry">
+<span>Biochemistry</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">8</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="histology">
+<span>Histology &amp; Spotters</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">8</span>
+</button>
+<button class="filter-btn px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-cyan-500/20 hover:border-cyan-400/40 text-slate-300 hover:text-white font-mono text-xs transition-all flex items-center gap-2" data-cat="question-bank">
+<span>Question Bank</span>
+<span class="font-mono text-[10px] px-1.5 py-0.5 rounded-md bg-slate-950 text-slate-400">7</span>
+</button>
+</div>
+</div>
+</section>
+<!-- TWO COLUMN CORE REPOSITORY ARCHITECTURE (75% ARCHIVE + 25% TELEMETRY & SPONSORED SUITE) -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+<!-- CORE REPOSITORY FEED (XL: 9 COLS) -->
+<div class="xl:col-span-9 flex flex-col gap-14" id="repo-stream">
+<!-- SECTION 1: MBBS TEXTBOOKS & CLINICAL ATLASES -->
+<section class="reveal-elem flex flex-col gap-5" data-section="textbooks">
+<div class="flex items-center justify-between border-b border-cyan-500/15 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-neon-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+<span class="material-symbols-outlined text-xl">menu_book</span>
+</div>
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">MBBS Master Atlases &amp; Textbooks</h2>
+<span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-500/30 text-neon-cyan">21 VOLUMES</span>
+</div>
+<p class="text-xs text-slate-400 font-sans">Pre-clinical textbooks, digital clinical references &amp; high-yield illustrated guides</p>
+</div>
+</div>
+</div>
+<!-- Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- Gray's Anatomy -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Gray's Anatomy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmlUnKrAuEOmrBvzegoCL85bkCZHVyMM9gmSp-4W98r35mtOwiBEEga4ypC9ZThC2DkS5GgLyvq0O1lTO-NU19JjHDS8WvEF-ud6tR9PLltZlmjIjCxlB_-evu9Yi7VR5L5piSYaFgTG3joc9V3QQBwVoel_QyBee_LSwivmHjp8tYj8fDvL-FdAwPfL4YdOfXhkLiFdqPUCI16MxWqBX4kEIlklRtJHmliqj0rNEtrVjwnt-TkjB4"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Anatomy</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-neon-teal font-mono text-[9px]">44th Edition</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Gray's Anatomy (14th Ed)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A renowned and comprehensive anatomy reference known for its detailed descriptions, precise anatomical relationships, and strong clinical relevance.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/30" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Snell's Clinical Neuroanatomy -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Snell's Clinical Neuroanatomy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV-d-SEMeDbOwtJFlirUGkv8nza8HsuMuzljT2352I9OCl2OUx-gbJpiQFfSnJ9t09H6m0GSngsnnPcZOcNlekCM8eav6z9oJ9c7_5Gi4LGfhB9E4LTjpBOPE1rvlMpW_akOqZ57UW_Uj1zA4auYGOp_QpfWrzx5NJj66-S2FfnmLFGNTR92dH0vkvpT_hR4z3agUA1DpZhCb9z7lU8DSavKxU7Eg_gtsUO5uAenzNdMvtbP6P6AUw"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Neuroanatomy</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-cyan-950/80 border border-cyan-500/30 text-neon-cyan font-mono text-[9px]">6th Edition</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Snell's Clinical Neuroanatomy (6th Ed)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A concise and clinically oriented neuroanatomy textbook that explains complex neural structures and pathways with clear illustrations and practical clinical correlations.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/199" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- BD Chaurasia Upper Limb & Thorax -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="BD Chaurasia Upper Limb" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuS-INRSAixLUVZZgPM6gXBDNkvT0BfF2qTIOFMYsA09C-YaCUC_v5lNcDTAUEr-X28Or5rA1aCpFT5NvoDUiHMCSIho55mu75foqn-sgb1sfelSJ6t7-H52ukZMWUynVr4OSNnVc7wvavle22ojgZs2x8lt101pA5kNCrqvyNSK7C3FpPG3p_0I5l3TOfNUlpKJgE_6BNeRsWBTqcF7JC14ESG8dpa4JRFqftk3B5dWIWycji_JDW"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Anatomy</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-neon-teal font-mono text-[9px]">8th Edition</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">BD Chaurasia Upper Limb &amp; Thorax</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A practical, dissection-oriented anatomy book covering the structures of the upper limb and thorax with clear clinical correlations.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/34" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Netter Atlas (8th Ed) -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Netter Atlas" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvugBXMTWNH0xJpGWvG2HhePRCRxqIA9krKUd0Z6VhQdzSL8WeTP6scEMzGaOTyQRFGJywpT40_CsaZ_YgmBYsF0mMFqKPAOP-RKCnPMoGtzw2eM-c8EV1SsUjkeyvb7Or0QeO1l0UVY3rZwBv3Sxxr_vpj3ML90qMd-rc1Mi6GdiJJKFn1JqDd0k6ha41PsjEY9LzWVAa56diZ57XCPsh_LEWIR9rKQcDCNJBI4MjTZj5jNL1WkAC"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Atlas</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-purple-950/80 border border-purple-500/30 text-purple-300 font-mono text-[9px]">8th Edition</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Netter Atlas of Human Anatomy (8th Ed)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A beautifully illustrated anatomy atlas renowned for its detailed anatomical drawings, precise labeling, and exceptional visual clarity.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/59" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Guyton & Hall Medical Physiology -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Guyton &amp; Hall Physiology" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_9TWA1k-wg9EU3Wo65yWHUtqqKCArV8CNEF5HQ71KbKR4EW6ltubtYBhuK-Ntttu8DiTRDYKSd-toDpWjn_eSTmTx6wv7_WmMU_AKLdHtpLDjTbgNPNOSe9efW78gDb-IyzesaeogYz4zxgMbqSjjwVb3o5czVHHY_NfIH8_aKfaZsDAh_XfZbfkZuTpCtkk4D7Lf39yBJy6T25LHbkq5oq-URAeq5e3Txo8kySsg-RHbmQXgow3H"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-emerald-500/30 backdrop-blur-md text-neon-teal font-mono text-[10px] font-bold">Physiology</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-neon-teal font-mono text-[9px]">15th Edition</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Guyton &amp; Hall Medical Physiology (15th Ed)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A comprehensive and highly regarded textbook that explains human physiology through clear concepts, detailed mechanisms, and clinical insights.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/78" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Harper's Illustrated Biochemistry -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Harper's Biochemistry" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOXnEhc3U3DzSqqx0SrNj_4r1sDltmlwc3w2XCZlaZ-veCSWWSNCQ18YqnEtKbTIr7t4sAZjvCOcUT4snsD_ljfo1jav3lSZU1dOMMT_0SP-zJRPqdr8nDyxGVYAXTk3I-7tDIAtMusl0dtP5jAm59zJ4p7KVjnM9ajcyhpTXMLtMAVOOE-ussmOLPplYopm0RxBt92uxSxpVA-vXmaUUZdkG2o_6gsiaJ-HMisLCKGqdJ6A33VoID"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-amber-500/30 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold">Biochemistry</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-amber-950/80 border border-amber-500/30 text-amber-300 font-mono text-[9px]">Clinical Ed</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Harper's Illustrated Biochemistry</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A comprehensive and clinically oriented textbook that presents biochemical concepts with clear explanations and practical medical applications.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/73" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- IN-FEED NATIVE PROMOTIONAL BANNER: MED EDTECH SPONSOR -->
+<div class="reveal-elem w-full rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-950 to-slate-900/90 border border-cyan-500/25 p-5 sm:p-6 backdrop-blur-xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-5 group hover:border-cyan-400/50 transition-all">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/30 flex items-center justify-center text-neon-cyan shrink-0 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+<span class="material-symbols-outlined text-2xl">smart_display</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h4 class="font-bold text-white text-base">Lecturio &amp; Osmosis High-Yield Video Dispatches</h4>
+<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-neon-cyan border border-cyan-500/30">CLINICAL SUITE</span>
+</div>
+<p class="text-xs text-slate-400 mt-1 font-sans">
+                  Interactive clinical video simulations paired with MediNote flashcard schematics. Access full MBBS Step 1/2 Qbanks and high-yield reviews.
+                </p>
+</div>
+</div>
+<a class="shrink-0 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-neon-cyan text-neon-cyan hover:text-slate-950 font-mono text-xs font-bold transition-all border border-cyan-500/30" href="https://t.me/AREA_139" target="_blank">
+              Access Video Modules
+            </a>
+</div>
+<!-- SECTION 2: ANATOMY HANDNOTES & BLUEPRINTS -->
+<section class="reveal-elem flex flex-col gap-5" data-section="anatomy" id="section-blueprints">
+<div class="flex items-center justify-between border-b border-cyan-500/15 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-neon-teal shadow-[0_0_15px_rgba(0,229,163,0.2)]">
+<span class="material-symbols-outlined text-xl">accessibility_new</span>
+</div>
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">Anatomy Handnotes &amp; Blueprints</h2>
+<span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-teal-500/20 border border-teal-500/30 text-neon-teal">17 SCHEMATICS</span>
+</div>
+<p class="text-xs text-slate-400 font-sans">Gross anatomical schematics, neurovascular plexuses, triangles &amp; cranial pathways</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- Mediastinum illustration -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Mediastinum" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8Bx4NdTPOVAFAglc6kkZ8_MPDU-V2P9UtLqdRTjZ3Pq6-S9WEG1nausPL03Vzuuzlx8W6Jg1BxoF3clQY28pIb5K1-HqGOQ7khVGVCaxvXmTy0diSQCn4go0mQPh4MJCNfIzTvsMbysFrvwLKOTXOJX7lICYbcuN08LPsmRS3zBCRG1nhXi1i422fPFuArI_fLZaha7uV0cjpUrq7OQBZFkHzovTG-E2R6YCZSIwdet9EHh-mds-Z"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Thorax</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Mediastinum Illustration</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A clear anatomical illustration showing boundaries, divisions, and major structures of the mediastinum for easy rapid revision.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Simplified Schematic</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/8" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Development of Viscera -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Development of Viscera" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3g3N7ocMM6Uv-ZsHSf9fbjoaaI1p5q2B2i0DbhtHxxnboZ4AGn6RyCFkQRH6Q7U5sW9hJDe_ZoAG8Y5_1nDwyfY0Zs7A1hCb7WOjuIGLTegp5W9WUUSft1VeX5-U0yg0vl-j0WzXQPLRqYGbd2IOpS_I63VrvydlF-M6EL49Du9V1JA0orSne2jlujEXZ2HsruJXVigDCSntAoSOO2kQbq6nZdpAyZrWYIeH8gpZzfVqI82KZQ3Wz"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Thorax</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Development of Viscera (Thorax &amp; Diaphragms)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Embryological development of thoracic organs and diaphragm, highlighting origins, pleuroperitoneal membranes, and key developmental shifts.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Embryology Flow</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/9" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Arrangement of Hilum of lung -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Hilum of Lung" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCwIwW_keR5hN9h2MXo2OKdV_1CPo69UrQH6ExgpMvNKN0DhN7Kh9xdm1COpVlmbnQ7hjITUSlsEF83XOMKsduuK-VzlqdZ_JW3BZVqfnjwELqDOteJ5zh8Ar1XutxD4WaxZ7frQDMXm3qF-JdwBWpomq_yfRKMwhwMNPdrZaumWX1k_wKghcfA_KiPTzcp0S5msXJ1Iq7JtExgOp9YNEP-F2Bew73gp9TsPdwa1HG0NvmPuIQsA7a"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Thorax</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Arrangement of Hilum of Lung</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    A concise anatomical guide showing the exact arrangement of the bronchus, pulmonary vessels, and structures at the lung hilum.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Vector Blueprint</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://drive.google.com/uc?export=download&amp;id=1sK7sV3DxKekiRLIG2aTM9P_frXzXxS3k" target="_blank">
+<span>Direct Download</span>
+<span class="material-symbols-outlined text-xs">arrow_downward</span>
+</a>
+</div>
+</div>
+<!-- Story of Upper Limb -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Story of Upper Limb" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAA4eANRv5grG6S_IAbBDutXxYGNkDsvc_yVMoCXlXnXJ0egKXAMcQ63HbpxQht5rTBrrGY6Tmqioc1LKAnHAa7y5-iSukIrZlA_A5ViLa0TZErapvkp9tRVhG3LCixB-wltenWrFvpVyEesY1VxbJTB3edNyRq1tiDahtUElaoOgpOxh5FiE_jAtMA2V-Wbq4Q17kTYhaN9I7xC6WVpVkMS1XKQN5klOB16xf3o4qE9JWj72qR2xJh"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-cyan-500/30 backdrop-blur-md text-neon-cyan font-mono text-[10px] font-bold">Superior Extremity</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Story of Upper Limb</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Anatomical journey through key regions and landmarks: anatomical snuff box, cubital fossa, flexor retinaculum, and carpal tunnel syndrome.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Clinical Pearls</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/13" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Broadman's Area of Brain -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Broadman Areas" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCImZyL9moJCcRJ137wDvt8JYqARMaT90EAV3G06pPrmiKwNesUT_kHeMcoslfnK4goMCDiyOdj1i1TBwDj5_JLXxo-NxjIHXkhr8V3Ed71gwfh1c_u82Z_zQ-pvoCImF_hVJFdfzjrfrHt1eiIevbZTXKgotQgkA82Vndwersi_P3sQYAWvXAjpJj5eqkvyF9X93Iisv0FgyobMm6puhydHbEWJ3zjOM4yJ_3tdc9Hc8JzldRL6KZD"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-purple-500/30 backdrop-blur-md text-purple-300 font-mono text-[10px] font-bold">Cortex Map</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Brodmann Areas &amp; Homunculus</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Detailed schema of Brodmann cytoarchitectonic areas of the cerebral cortex, primary motor and somatosensory cortex, and motor homunculus.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Neural Schema</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/204" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Cranial Nerve note -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Cranial Nerves" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5gzTimAraMdfZTet79NSHqO1a77zD2jSja79i7jbcpEI_OY00yPeCHKjIBL-6362cCbthXZVu9kuoxljZl3tAltB-KEUDuT4GT-8f-rpdJELSehYpdXhOvpbfjNPbps6nS45HDios3mdk9unthBhyLKufneKJxF9_Bn0L0GVZ9l14u8cG5iofQC_P6JLo5-dvm5gCmKiXCdY45cwbpqNskzyJkm1VseJPGiz5kCD5f2UlmDSW2zc2"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-purple-500/30 backdrop-blur-md text-purple-300 font-mono text-[10px] font-bold">Brainstem</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Cranial Nerves Nuclei &amp; Pathways</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Clear guide on cranial nerve nuclei columns, functional components (GSA, GVA, SVE, GVE), brainstem emergence, and cranial foramina.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Master Chart</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://drive.google.com/uc?export=download&amp;id=1Wmk6JxDXSbVliYsLlCYOSm6zJ7r0AOBV" target="_blank">
+<span>Direct Download</span>
+<span class="material-symbols-outlined text-xs">arrow_downward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 3: PHYSIOLOGY & BIOCHEMISTRY SLIDE SETS -->
+<section class="reveal-elem flex flex-col gap-5" data-section="physiology" id="section-physiology">
+<div class="flex items-center justify-between border-b border-cyan-500/15 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+<span class="material-symbols-outlined text-xl">vital_signs</span>
+</div>
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">Physiology &amp; Biochemistry Slide Sets</h2>
+<span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-purple-300">11 MODULES</span>
+</div>
+<p class="text-xs text-slate-400 font-sans">Cardiovascular hemodynamics, metabolic cycles &amp; lecture slide decks</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- Arif Physiology Vol 1 -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Arif Physiology" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2QA62h3wafA03a642NLHHM2l1rpzbqxzPNB0fFJg1Md0N7VGwR0jpdse8OcR9aIbVt8laka4PhyfJXjO1lV3mKIbfXBEj66yTmyJDKpR7LgsmNnaPmBIpwrfBFYPg2MrL3fHWq002axuq92XID47QzJrF0CFzihqabvx6AiGvCrH4mn6ek9JjiT_Rr1YSi38XAPPcFGwctyq2jVyGn6kpEfLK5VilTwIyijPS2y9NOm3_pAbgVsh7"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-emerald-500/30 backdrop-blur-md text-neon-teal font-mono text-[10px] font-bold">Physiology</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Arif Physiology (Volume-1)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Concise, exam-oriented guide covering essential physiological concepts with simplified explanations and quick revision-focused content.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/80" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Blueprint Biochemistry Vol 1 -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Blueprint Biochemistry" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8xlQbKEfMmFAasu__23g_dz6LmSSNqJfuzkS3DsYP_0whZu34n9pxJrqY-i6bBzVKMHrKYytrG_0jUmNUPUL0yXclDV0nyW3CldJLEYIWkd4kUM20ipsJfybKT_u806-5AwiCV1zq1gT4QwyCpFTFksd1B6YBS03ggakFU9dlI_v6aJl1lxbiZQKzHXWVFTMTAVyyDs1YXlLzcCnUgGYBHmnu5sbx6iASWnxIgDTHVNLd8ieSuvlr"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-amber-500/30 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold">Biochemistry</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Blueprint Biochemistry (Volume-1)</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    High-yield study guide covering metabolic pathways, enzyme kinetics, TCA cycle, and clinical genetics with precision charts.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete PDF Atlas</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/71" target="_blank">
+<span>Telegram Cloud</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Bodrul Shahriar Physiology Lecture Slides -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Physiology Lecture Slides" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA11GZZVZmeVDK11p3QB2sWcJy5t2ZbsSg0S6E4eBWuzmWZW52sO2ns0hblwcWYoJtMSv9V3uQW_306DsxRYVtyS8BXLulFLUvAGguwHCjGohjWMHoy8gjPwdkHaX8ZW01swB8QJjE3ThQDtQiX2X4Aou7IGSWSbwj4slrCnPU4_HkvyPATowIHvuyPV0gskwVNRab_f09K3IjToxbWXXKcMYstNNFM9vTS_w3TMvAwC07ChH63QMeY"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-emerald-500/30 backdrop-blur-md text-neon-teal font-mono text-[10px] font-bold">Lecture Deck</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Physiology Slides by Bodrul Shahriar</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Complete compiled slide deck of renal physiology, clearance, and endocrine regulation organized by Bodrul Shahriar (RpMC-53).
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete Slide Deck</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/bodrulshahriarmedical" target="_blank">
+<span>Telegram Channel</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION 4: HISTOLOGY & RADIOLOGY + QUESTION BANK -->
+<section class="reveal-elem flex flex-col gap-5" data-section="question-bank" id="section-qb">
+<div class="flex items-center justify-between border-b border-cyan-500/15 pb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.2)]">
+<span class="material-symbols-outlined text-xl">quiz</span>
+</div>
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-xl sm:text-2xl font-black text-white tracking-tight">Histology Spotters &amp; Prof Question Bank</h2>
+<span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-300">15 MODULES</span>
+</div>
+<p class="text-xs text-slate-400 font-sans">Past 10 years written question archive, viva flashcards, and practical spotters</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- RMU 1st Prof Written Question Bank -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="RMU Written Questions" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9O2YLdV4LXF6fEvbIZwfLWZEP8gi7NV0mnuXyNzKBWqAmAO4527LvEZpRj1VjHmNE1IPUNjxq3Cu3gGEA7Ud7aUxgmMEdSLlyUlXG0PZujjQD_pwX7U_dFKXmSi3DoNVIbb4XGKX2uX7GZibgdYC9qje1b5-AwAlMxHM-l90x3BOnNR5cKgdNcD7SDB9SJrmmPGLdZgCF8KbaVpTHgx9HQ4iLNWhmGWJ1afZ3YUKhxbylGCZje0QC"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-amber-500/30 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold">PROF (QB)</span>
+<span class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-cyan-950/80 border border-cyan-500/30 text-neon-cyan font-mono text-[9px]">10-Yr Archive</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">RMU 1st Prof Written Question Bank</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Categorized archive of Rajshahi Medical University 1st Professional examinations covering anatomy, physiology, and biochemistry.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Complete Archive</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://drive.google.com/drive/folders/1b1ixcCMX2SOGpvyt_wX4EgVL51O6VvuG" target="_blank">
+<span>Google Drive Folder</span>
+<span class="material-symbols-outlined text-xs">arrow_downward</span>
+</a>
+</div>
+</div>
+<!-- [THORAX] Prof Viva Card Questions -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Thorax Viva Cards" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGKuAg2RcMsHngUnONZm0pichIK85hJyT7I4JQvM07qansTX2x929s_jtkIvqqOHHeTYMgIoySAj_ZVyr9g2q60jXQ7aALMSZlODFPFqkdwvCvCJ3klXeTUn6ph34dJjVEMhPOTsCv1QzRfrNgFcwRl1pNHLcmeoIMTAGJhVTS0GZoUTaLsQSyWeDERZSt2_-CiYk1tggbWUxZpCCL36uABBrCh5cj1ayC6SbgFUTguQwn8_hiWlXW"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-amber-500/30 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold">Oral Viva</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">[THORAX] Prof Viva Card Questions</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Essential oral exam questions, pleural reflections, coronary circulation, and clinical cross-examination prompts asked by senior examiners.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Viva Cards PDF</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/216" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+<!-- Histology Identification Points -->
+<div class="doc-card rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-cyan-500/20 hover:border-cyan-400/60 transition-all duration-300 shadow-2xl hover:shadow-[0_0_30px_rgba(0,240,255,0.18)] hover:-translate-y-1.5 p-4 flex flex-col justify-between group">
+<div>
+<div class="relative w-full h-44 rounded-xl overflow-hidden mb-3 bg-slate-950">
+<img alt="Histology Spotters" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-0LfnG-zTYyXNp8kZdBVIIBOkLWov8CEK8cdg6wEopUMZxWg2sQnhJrZ_aDWG3ALxpQidZPIj3q1x4qokUuJKndrazYE2YN6byhPzQqt7NGyq3ziS1FnXdwq_Il17kN-fnQbyR4W9wilVgv9vl9IwRBgUd0Vi1vLNVYyokYL0jF21M9SMhv6gksG22cLG2gNln6wDibgNkOyXkLkYZBCF1wO9pSwME8uVXgzH7ZDQurQavJhOvSI5"/>
+<span class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-slate-950/80 border border-teal-500/30 backdrop-blur-md text-neon-teal font-mono text-[10px] font-bold">Spotter Pearls</span>
+</div>
+<h3 class="font-bold text-white text-base group-hover:text-neon-cyan transition-colors">Histology Identification Points</h3>
+<p class="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans">
+                    Practical microscopy identification points for liver lobule, kidney cortex, spleen, lymph nodes, and GI tract layers.
+                  </p>
+</div>
+<div class="pt-4 mt-3 border-t border-cyan-500/15 flex items-center justify-between font-mono text-xs">
+<span class="text-[11px] text-slate-400">Microscopy Guide</span>
+<a class="flex items-center gap-1.5 text-neon-cyan hover:text-white font-bold group-hover:underline" href="https://t.me/medinote_139/56" target="_blank">
+<span>Open in Telegram</span>
+<span class="material-symbols-outlined text-xs">arrow_outward</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- STICKY RIGHT TELEMETRY & SPONSORED SIDEBAR (XL: 3 COLS) -->
+<aside class="xl:col-span-3 flex flex-col gap-6 xl:sticky xl:top-24">
+<!-- FEATURED SPONSORED CARD: AMBOSS CLINICAL QBANK -->
+<div class="rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-cyan-500/25 p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between group hover:border-cyan-400/50 transition-all">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-cyan-500/15">
+<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-neon-cyan border border-cyan-500/30 uppercase">
+                  PARTNER SUITE
+                </span>
+<span class="text-[10px] font-mono text-slate-400">AMBOSS #139</span>
+</div>
+<div class="relative w-full h-36 rounded-xl overflow-hidden my-3 bg-slate-950">
+<img alt="AMBOSS Prep" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAg4O26AUcINm8HBkFcs_lnbdEmqQclxAq1xaUn3wuQoCkARIiqX-_8NitVvz5cQZuRPw95ZnJv4hhGmL8M1YLjS0phmIalEDf-cTmCwnAw26OtWYQoUveucmjypJDv0iDUApizqHW267UH6FJ4SEvScVFbnnqH_44UHQUdOpLXWYonyq484GdpLzLPp5TcNzY8hPLTed1rnz896bkhe29Uhc1bSYKNTYGDwSQ5hFzYfzgCrbROdbWj"/>
+<div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex items-end p-2.5">
+<span class="font-bold text-xs text-white">AMBOSS Clinical QBank &amp; OSCE Simulator</span>
+</div>
+</div>
+<p class="text-xs text-slate-400 leading-relaxed font-sans">
+                Interactive clinical reasoning cases, diagnostic calculators, and Bangladesh BMDC syllabus integrated questions.
+              </p>
+<!-- Dynamic Countdown Timer -->
+<div class="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/15 my-3 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-[9px] font-mono text-slate-400">INSTITUTIONAL ACCESS</span>
+<span class="font-mono text-xs font-bold text-neon-teal" id="promo-timer">04d : 18h : 31m : 42s</span>
+</div>
+<span class="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-neon-teal font-mono text-[10px] font-bold">
+                  ACTIVE
+                </span>
+</div>
+</div>
+<a class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-mono text-xs font-bold text-center transition-all shadow-[0_0_15px_rgba(0,240,255,0.3)]" href="https://t.me/AREA_139" target="_blank">
+              Unlock Academic Trial
+            </a>
+</div>
+<!-- WARD DESK TELEMETRY & CLINICAL CALCULATORS -->
+<div class="rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-cyan-500/25 p-5 shadow-2xl flex flex-col gap-3">
+<div class="flex items-center justify-between pb-2 border-b border-cyan-500/15">
+<span class="font-mono text-xs font-bold text-white tracking-wider uppercase flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-neon-cyan">monitor_heart</span>
+                WARD TELEMETRY
+              </span>
+<span class="w-2 h-2 rounded-full bg-neon-teal animate-ping"></span>
+</div>
+<div class="space-y-2 font-mono text-xs">
+<div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 flex items-center justify-between hover:border-cyan-400/30 transition-colors">
+<span class="text-slate-400">ABG / Henderson:</span>
+<span class="text-neon-cyan font-bold">PaCO₂ 40 / pH 7.40</span>
+</div>
+<div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 flex items-center justify-between hover:border-cyan-400/30 transition-colors">
+<span class="text-slate-400">Fluid Parkland:</span>
+<span class="text-neon-teal font-bold">4mL × kg × %TBSA</span>
+</div>
+<div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 flex items-center justify-between hover:border-cyan-400/30 transition-colors">
+<span class="text-slate-400">Anion Gap:</span>
+<span class="text-purple-300 font-bold">Na - (Cl + HCO₃)</span>
+</div>
+<div class="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/15 flex items-center justify-between hover:border-cyan-400/30 transition-colors">
+<span class="text-slate-400">Cloud Sync:</span>
+<span class="text-neon-cyan font-bold">v5.02 Live (14ms)</span>
+</div>
+</div>
+</div>
+<!-- SPONSORED PHYSICAL BLUEPRINTS & 3D RIGS -->
+<div class="rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-cyan-500/25 p-5 shadow-2xl flex flex-col gap-2 relative overflow-hidden group hover:border-teal-400/50 transition-all">
+<div class="flex items-center justify-between">
+<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-teal-500/20 text-neon-teal border border-teal-500/30 uppercase">
+                SPONSORED CLINICAL TOOLS
+              </span>
+<span class="material-symbols-outlined text-xs text-neon-teal">verified</span>
+</div>
+<h4 class="font-bold text-white text-sm pt-1">3D Precision Anatomical Skull &amp; Cranial Plexus</h4>
+<p class="text-xs text-slate-400 leading-relaxed font-sans">
+              Medical-grade dissectible skull with color-coded cranial foramina, sutures, and removable brain sections. Express dispatch to RpMC student dorms.
+            </p>
+<a class="mt-2 text-neon-cyan hover:text-neon-teal font-mono text-xs font-bold flex items-center gap-1" href="https://t.me/AREA_139" target="_blank">
+<span>Inspect Physical Models</span>
+<span class="material-symbols-outlined text-xs">arrow_forward</span>
+</a>
+</div>
+<!-- CURATOR DISPATCH BADGE -->
+<div class="p-4 rounded-2xl bg-slate-950/90 border border-cyan-500/20 shadow-inner flex items-center gap-3">
+<img alt="Ahmed Istiaq" class="w-11 h-11 rounded-xl object-cover ring-1 ring-cyan-400/50 p-0.5 bg-slate-900" src="https://lh3.googleusercontent.com/aida/AEtjO1Xk4t8_ST1f3FlV8K43DHsdAJ-_HShPn3uf6b-Vuwp-ho5wsReb-aLUT21a2IjfWr0eDLV5B_8iyjcdMJh79Y_-t6CRvVop4WbJVyZ-kkbwLT5UzuTCFp997VIsavd7iQUdZdbmo7aCVFrYc-6gxcFBIsT87Uhz8Rg9XTpJdh_Ru619t9HS7qAayRchiDKa4AByvMOGt-xDaDmJrnVFsYcSvopIBr-WMDd07fTTmtKQ-HUKMytiuylF5Bk"/>
+<div class="min-w-0 flex-1">
+<div class="font-mono text-xs font-bold text-white truncate flex items-center gap-1">
+                Ahmed Istiaq
+                <span class="text-neon-cyan">✓</span>
+</div>
+<div class="text-[11px] text-slate-400 truncate">RpMC-54 · Systems Lead</div>
+<div class="text-[10px] font-mono text-neon-teal font-bold tracking-wider">ARCHIVE LEAD OPERATOR</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- BOTTOM CALL TO ACTION: STUDY SMARTER - REMEMBER MORE -->
+<section class="reveal-elem w-full rounded-3xl bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-cyan-500/30 p-8 sm:p-12 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="absolute -top-20 -left-20 w-72 h-72 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-20 -right-20 w-72 h-72 bg-teal-500/15 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex items-center gap-5 relative z-10">
+<div class="w-16 h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-neon-cyan shrink-0 shadow-[0_0_25px_rgba(0,240,255,0.3)]">
+<span class="material-symbols-outlined text-3xl">psychology_alt</span>
+</div>
+<div class="space-y-1.5">
+<h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Study Smarter — Remember More
+            </h2>
+<p class="text-xs sm:text-sm text-slate-300 max-w-xl font-sans">
+              Your centralized hub for high-yield medical notes, anatomy resources, clinical learning, and OSCE preparation. Directly synchronized with Rangpur Medical College clinical batches.
+            </p>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-3 shrink-0 w-full md:w-auto relative z-10">
+<a class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-mono text-xs font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.3)] transition-all" href="https://t.me/AREA_139" target="_blank">
+<span class="material-symbols-outlined text-sm">send</span>
+<span>Join @AREA_139</span>
+</a>
+<a class="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 text-white font-mono text-xs font-bold flex items-center justify-center gap-2 transition-colors" href="#repo-stream">
+<span>Explore Blueprints</span>
+<span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</section>
+</div>
+</main>
+<!-- CYBERNETIC FOOTER -->
+<footer class="w-full bg-slate-950 border-t border-cyan-500/20 mt-12 py-12">
+<div class="max-w-[1440px] mx-auto px-4 sm:px-8">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-cyan-500/15">
+<!-- Col 1: System Identification -->
+<div class="space-y-3">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-neon-cyan">
+<span class="material-symbols-outlined text-sm">vital_signs</span>
+</div>
+<span class="font-bold text-white text-base font-mono">MediNote Academic</span>
+</div>
+<p class="text-xs text-slate-400 leading-relaxed font-sans">
+            High-yield clinical syntheses, anatomical atlases, and medical telemetry. Maintained for peer review and evidence-based MBBS curriculum mastery.
+          </p>
+<div class="pt-1">
+<span class="text-[10px] font-mono text-neon-teal uppercase font-bold">Affiliation: Rangpur Medical College</span>
+<p class="text-xs text-slate-500">Department of Clinical Medicine &amp; Biomedical Informatics</p>
+</div>
+</div>
+<!-- Col 2: Ethical Declarations & DOI -->
+<div class="space-y-3 font-mono text-xs">
+<div class="text-white font-bold uppercase tracking-wider text-xs">Ethical Declarations &amp; DOI</div>
+<p class="text-slate-400 text-[11px] font-sans">All clinical syntheses adhere to ICMJE recommendations. Resources provided strictly for academic research and evidence verification.</p>
+<div class="space-y-1 text-slate-400">
+<div class="flex justify-between py-0.5">
+<span>DOI Prefix:</span>
+<span class="text-neon-cyan">10.1390/medinote</span>
+</div>
+<div class="flex justify-between py-0.5">
+<span>ISSN (Digital):</span>
+<span class="text-slate-200">2841-9430</span>
+</div>
+<div class="flex justify-between py-0.5">
+<span>Indexing:</span>
+<span class="text-neon-teal">NLM Catalog Id: 10492</span>
+</div>
+</div>
+</div>
+<!-- Col 3: Cryptographic Verification -->
+<div class="space-y-3 font-mono text-xs">
+<div class="text-white font-bold uppercase tracking-wider text-xs">Cryptographic Verification</div>
+<p class="text-slate-400 text-[11px] font-sans">Verify medical documentation authenticity via Master Clinical Hash.</p>
+<div class="p-3 rounded-xl bg-slate-900 border border-cyan-500/15 space-y-1">
+<div class="text-neon-cyan flex items-center justify-between text-[11px]">
+<span>PGP FINGERPRINT</span>
+<span class="w-1.5 h-1.5 rounded-full bg-neon-teal"></span>
+</div>
+<div class="font-mono break-all text-slate-500 text-[9px] leading-tight">
+              F892 41D3 B650 91A2 7E10 49CC 139A MEDI NOTE 2025
+            </div>
+</div>
+</div>
+<!-- Col 4: Node Comms -->
+<div class="space-y-3 font-mono text-xs">
+<div class="text-white font-bold uppercase tracking-wider text-xs">Clinical Node Comms</div>
+<p class="text-slate-400 text-[11px] font-sans">Encrypted channels and academic distribution networks.</p>
+<div class="grid grid-cols-2 gap-2">
+<a class="p-2 rounded-lg bg-slate-900 border border-cyan-500/20 hover:border-neon-cyan text-slate-300 hover:text-white flex items-center justify-between transition-colors" href="https://t.me/AREA_139" target="_blank">
+<span>Telegram</span>
+<span class="text-neon-cyan text-[10px]">@AREA_139</span>
+</a>
+<a class="p-2 rounded-lg bg-slate-900 border border-cyan-500/20 hover:border-neon-cyan text-slate-300 hover:text-white flex items-center justify-between transition-colors" href="#">
+<span>WhatsApp</span>
+<span class="text-slate-500 text-[10px]">Liaison</span>
+</a>
+<a class="p-2 rounded-lg bg-slate-900 border border-cyan-500/20 hover:border-neon-cyan text-slate-300 hover:text-white flex items-center justify-between transition-colors" href="#">
+<span>YouTube</span>
+<span class="text-slate-500 text-[10px]">Lectures</span>
+</a>
+<a class="p-2 rounded-lg bg-slate-900 border border-cyan-500/20 hover:border-neon-cyan text-slate-300 hover:text-white flex items-center justify-between transition-colors" href="#">
+<span>X / Matrix</span>
+<span class="text-slate-500 text-[10px]">Dispatch</span>
+</a>
+</div>
+</div>
+</div>
+<!-- Legal Subfooter -->
+<div class="pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
+<div>
+          © 2025 MediNote Neural Archive (@AREA_139). Curated by Ahmed Istiaq · Rangpur Medical College Clinical Sciences Unit.
+        </div>
+<div class="flex items-center gap-4">
+<a class="hover:text-neon-cyan transition-colors" href="#">Terms of Clinical Use</a>
+<span>·</span>
+<a class="hover:text-neon-cyan transition-colors" href="#">Institutional Privacy</a>
+<span>·</span>
+<a class="hover:text-neon-cyan transition-colors" href="#">Security &amp; Hash Keys</a>
+</div>
+</div>
+</div>
+</footer>
+<!-- CLIENT-SIDE DYNAMIC INTERACTIONS & SCROLL REVEALS SCRIPT -->
+<script>
+    (function initMediNoteEcosystem() {
+      // 1. Scroll Reveal IntersectionObserver
+      const revealElems = document.querySelectorAll('.reveal-elem');
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('revealed');
+              obs.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+        revealElems.forEach(elem => observer.observe(elem));
+      } else {
+        revealElems.forEach(el => el.classList.add('revealed'));
+      }
+
+      // 2. Interactive Cursor Glow
+      const glow = document.getElementById('cursor-glow');
+      if (glow) {
+        document.addEventListener('mousemove', (e) => {
+          glow.style.left = e.clientX + 'px';
+          glow.style.top = e.clientY + 'px';
+          glow.style.opacity = '1';
+        });
+        document.addEventListener('mouseleave', () => {
+          glow.style.opacity = '0';
+        });
+      }
+
+      // 3. Search Protocol Filtering
+      const searchInput = document.getElementById('clinical-search');
+      const cards = document.querySelectorAll('.doc-card');
+      
+      if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+          const q = e.target.value.toLowerCase().trim();
+          cards.forEach(card => {
+            const title = card.querySelector('h3')?.textContent.toLowerCase() || '';
+            const desc = card.querySelector('p')?.textContent.toLowerCase() || '';
+            const badge = card.querySelector('span')?.textContent.toLowerCase() || '';
+            if (title.includes(q) || desc.includes(q) || badge.includes(q)) {
+              card.style.display = 'flex';
+            } else {
+              card.style.display = 'none';
+            }
+          });
+        });
+
+        window.addEventListener('keydown', (e) => {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+          }
+        });
+      }
+
+      // 4. Category Filter Tabs
+      const filterBtns = document.querySelectorAll('.filter-btn');
+      const sections = document.querySelectorAll('#repo-stream > section');
+
+      filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          filterBtns.forEach(b => {
+            b.classList.remove('active-chip', 'bg-neon-cyan', 'text-slate-950', 'shadow-[0_0_15px_rgba(0,240,255,0.4)]');
+            b.classList.add('bg-slate-900/80', 'text-slate-300');
+          });
+          btn.classList.add('active-chip', 'bg-neon-cyan', 'text-slate-950', 'shadow-[0_0_15px_rgba(0,240,255,0.4)]');
+          btn.classList.remove('bg-slate-900/80', 'text-slate-300');
+
+          const cat = btn.getAttribute('data-cat');
+          sections.forEach(sec => {
+            const sCat = sec.getAttribute('data-section');
+            if (cat === 'all' || sCat === cat) {
+              sec.style.display = 'flex';
+            } else {
+              sec.style.display = 'none';
+            }
+          });
+        });
+      });
+
+      // 5. Promo Countdown Timer
+      const timer = document.getElementById('promo-timer');
+      if (timer) {
+        let secs = (4 * 86400) + (18 * 3600) + (31 * 60) + 42;
+        setInterval(() => {
+          if (secs > 0) {
+            secs--;
+            const d = Math.floor(secs / 86400);
+            const h = Math.floor((secs % 86400) / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            const s = secs % 60;
+            timer.textContent = `${String(d).padStart(2, '0')}d : ${String(h).padStart(2, '0')}h : ${String(m).padStart(2, '0')}m : ${String(s).padStart(2, '0')}s`;
+          }
+        }, 1000);
+      }
+    })();
+  </script>
+</body></html>
